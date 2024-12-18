@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = 'imenmechergui/mini-projet-devops:latest'
+        DOCKER_CREDENTIALS = 'docker-hub-credentials-id' 
+    }
+
+    stages {
+        stage('Cloner le code') {
+            steps {
+                git branch: 'main', url: 'https://github.com/islemmechergui/mini-projet-devops.git'
+            }
+        }
+
+        stage('Construire l\'image Docker') {
+            steps {
+                script {
+                    docker.build("${DOCKER_IMAGE}")
+                }
+            }
+        }
+
+        stage('Pousser l\'image sur Docker Hub') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_CREDENTIALS}") {
+                        docker.image("${DOCKER_IMAGE}").push()
+                    }
+                }
+            }
+        }
+
+        stage('Déployer le conteneur') {
+            steps {
+                script {
+                    sh """
+                    docker rm -f simple-api-container || true
+                    docker run -d -p 8080:8080 --name simple-api-container ${DOCKER_IMAGE}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Déploiement réussi !'
+        }
+        failure {
+            echo 'Le pipeline a échoué.'
+        }
+    }
+}
